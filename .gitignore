@@ -1,0 +1,18 @@
+node_modules/
+dist/
+
+# Secrets — .env.example is the committed template.
+.env
+.env.local
+
+# Generated at runtime: SQLite db, TMDB metadata and image cache, catalog snapshot.
+data/
+
+# Your library. Big, and not ours to track.
+movies/
+posters/*
+!posters/placeholder.svg
+
+*.log
+.DS_Store
+backdated_commit.sh
