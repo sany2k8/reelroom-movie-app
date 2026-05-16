@@ -1,0 +1,22 @@
+[
+  {
+    "id": "1",
+    "title": "Maareesan",
+    "year": 2025,
+    "genre": ["Thriller", "Drama", "Action"],
+    "duration": "152 min",
+    "description": "A petty thief embarks on a road trip with an elderly man suffering from memory loss under deceptive pretenses. As they journey across Tamil Nadu, the promise of an easy con unravels into a quietly shifting connection, with both men hiding secrets of their own.",
+    "poster": "maareesan.webp",
+    "file": "maareesan.mp4"
+  },
+  {
+    "id": "2",
+    "title": "Kishkindha Kaandam",
+    "year": 2024,
+    "genre": ["Thriller","Mystery", "Drama"],
+    "duration": "104 min",
+    "description": "Strange events unfold in a monkey-inhabited village, drive a newlywed couple and forest officials to embark on a mission to uncover the root cause of the unusual disturbances",
+    "poster": "kishkinda kaandam.jpg",
+    "file": "Kishkindha Kaandam.mp4"
+  }
+]
