@@ -1,0 +1,39 @@
+services:
+  reelroom:
+    build: .
+    image: reelroom:2.0.0
+    container_name: reelroom
+    restart: unless-stopped
+    # 3000 on the host is what ngrok/cloudflared already point at.
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      REELROOM_PIN: ${REELROOM_PIN:?set REELROOM_PIN in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?generate with openssl rand -hex 32}
+      TMDB_API_KEY: ${TMDB_API_KEY:-}
+      TRUST_PROXY: "true"
+    volumes:
+      # Media is mounted read-only — the app never needs to write to it.
+      - ./movies:/app/movies:ro
+      - ./posters:/app/posters:ro
+      - ./movies.json:/app/movies.json:ro
+      # SQLite, the TMDB cache and the catalog snapshot must survive restarts.
+      - reelroom-data:/app/data
+    # Node + a whole-library scan is comfortable well under this; the cap just
+    # stops a runaway from squeezing everything else on the machine.
+    mem_limit: 512m
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  reelroom-data:
