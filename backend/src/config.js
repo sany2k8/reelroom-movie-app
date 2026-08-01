@@ -21,7 +21,7 @@ const schema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
 
   /** Shared household PIN. Anyone with the tunnel URL still needs this. */
-  REELROOM_PIN: z.string().min(4).default("1234"),
+  SUNFLIX_PIN: z.string().min(4).default("1234"),
   /** Signs the session cookie. Rotating it logs everybody out. */
   SESSION_SECRET: z.string().min(16).optional(),
   SESSION_DAYS: z.coerce.number().int().positive().default(30),
@@ -52,8 +52,8 @@ const isProd = env.NODE_ENV === "production";
 if (isProd && !env.SESSION_SECRET) {
   throw new Error("SESSION_SECRET is required when NODE_ENV=production");
 }
-if (isProd && env.REELROOM_PIN === "1234") {
-  throw new Error("Refusing to start in production with the default REELROOM_PIN");
+if (isProd && env.SUNFLIX_PIN === "1234") {
+  throw new Error("Refusing to start in production with the default SUNFLIX_PIN");
 }
 
 export const config = {
@@ -61,7 +61,7 @@ export const config = {
   isProd,
   port: env.PORT,
 
-  pin: env.REELROOM_PIN,
+  pin: env.SUNFLIX_PIN,
   sessionSecret: env.SESSION_SECRET ?? crypto.randomBytes(32).toString("hex"),
   sessionMaxAgeMs: env.SESSION_DAYS * 24 * 60 * 60 * 1000,
 
@@ -85,7 +85,7 @@ export const config = {
   publicOrigin: env.PUBLIC_ORIGIN ?? null,
 };
 
-config.paths.db = path.join(config.paths.data, "reelroom.db");
+config.paths.db = path.join(config.paths.data, "sunflix.db");
 config.paths.tmdbCache = path.join(config.paths.data, "tmdb");
 config.paths.imageCache = path.join(config.paths.data, "images");
 config.paths.catalogSnapshot = path.join(config.paths.data, "catalog.json");

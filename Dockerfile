@@ -36,10 +36,10 @@ COPY backend/ ./backend/
 COPY --from=ui /app/frontend/dist ./frontend/dist
 
 # Never run as root — this process reads a whole media directory.
-RUN useradd --system --uid 10001 --create-home reelroom \
+RUN useradd --system --uid 10001 --create-home sunflix \
   && mkdir -p /app/data \
-  && chown -R reelroom:reelroom /app
-USER reelroom
+  && chown -R sunflix:sunflix /app
+USER sunflix
 
 EXPOSE 3000
 

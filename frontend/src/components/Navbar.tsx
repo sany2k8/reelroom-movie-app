@@ -62,9 +62,9 @@ export function Navbar() {
       )}
     >
       <nav className="mx-auto flex h-16 max-w-[1600px] items-center gap-3 px-4 sm:h-[70px] sm:gap-6 sm:px-8">
-        <Link to="/" className="flex shrink-0 items-baseline gap-2" aria-label="Reelroom home">
+        <Link to="/" className="flex shrink-0 items-baseline gap-2" aria-label="SunFlix home">
           <span className="font-display text-2xl tracking-wider sm:text-[28px]">
-            REEL<span className="text-amber">ROOM</span>
+            Sun<span className="text-amber">Flix</span>
           </span>
         </Link>
 

@@ -72,7 +72,7 @@ function EmptyLibrary() {
         </div>
         <h1 className="section-title mb-3">Your screening room is empty</h1>
         <p className="text-sm leading-relaxed text-muted">
-          Drop video files into the <code className="text-amber">movies/</code> folder and Reelroom
+          Drop video files into the <code className="text-amber">movies/</code> folder and SunFlix
           will pick them up, read their real duration and resolution, and pull artwork, cast and
           ratings from TMDB automatically.
         </p>

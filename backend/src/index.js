@@ -16,13 +16,13 @@ async function main() {
   const server = app.listen(config.port, () => {
     logger.info(
       { port: config.port, env: config.env, tmdb: tmdbEnabled() },
-      `Reelroom running on http://localhost:${config.port}`,
+      `SunFlix running on http://localhost:${config.port}`,
     );
     if (!tmdbEnabled()) {
       logger.warn("TMDB_API_KEY is not set — ratings, cast and backdrops will be missing");
     }
     if (config.pin === "1234") {
-      logger.warn("Using the default PIN (1234). Set REELROOM_PIN before exposing a tunnel.");
+      logger.warn("Using the default PIN (1234). Set SUNFLIX_PIN before exposing a tunnel.");
     }
   });
 

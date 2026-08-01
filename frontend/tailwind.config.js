@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Carried over from the original Reelroom palette — amber on near-black.
+        // Carried over from the original SunFlix palette — amber on near-black.
         ink: {
           DEFAULT: "#07090F",
           800: "#0B0E14",

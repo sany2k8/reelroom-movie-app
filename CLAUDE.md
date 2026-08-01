@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## What this is
 
-Reelroom is a private streaming app for the owner's own movie files, served from one machine and
+SunFlix is a private streaming app for the owner's own movie files, served from one machine and
 exposed to a handful of people over an **ngrok or cloudflared tunnel**. It is deliberately shaped
 like a production streaming site (hero carousel, faceted browse, custom player, per-profile watch
 state) while having no runtime dependency beyond an optional TMDB metadata fetch.
@@ -37,7 +37,7 @@ flowchart LR
     TMDB --> CACHE[(data/tmdb + data/images)]
     CAT --> SNAP[(data/catalog.json)]
 
-    AUTH --> DB[(SQLite data/reelroom.db)]
+    AUTH --> DB[(SQLite data/sunflix.db)]
     LIB --> DB
     STR -->|206 byte ranges| FS
 
@@ -73,7 +73,7 @@ npm run typecheck      # tsc --noEmit; must pass before any commit
 ```
 
 Never start a dev server with a raw background shell command — use the launch config in
-`.claude/launch.json` (`reelroom-api`, `reelroom-ui`) so logs stay readable.
+`.claude/launch.json` (`sunflix-api`, `sunflix-ui`) so logs stay readable.
 
 ## Layout
 
@@ -126,6 +126,12 @@ Each of these cost real debugging time. Don't rediscover them.
   `/api/download`. Compressing an already-compressed 2 GB file burns CPU for zero gain.
 - **Streaming is exempt from the rate limiter.** Seeking fires many small ranged requests; rate
   limiting them stalls playback.
+- **Tunnel :3000, never :5192 — and "Blocked request" means someone did.** Vite 5.4.12+ refuses
+  unrecognised `Host` headers (DNS-rebinding protection), so pointing cloudflared/ngrok at the dev
+  server fails with *"This host is not allowed"*. It looks sudden because the trigger is a Vite
+  upgrade, not a tunnel change. `vite.config.ts` allowlists the tunnel providers for deliberate dev
+  sharing (`TUNNEL=1 npm run dev`, which also fixes the HMR websocket) — never widen that to
+  `allowedHosts: true`.
 - **`secure` cookies and NODE_ENV.** With `NODE_ENV=production` the session cookie is secure-only —
   correct over the https tunnel, but sign-in silently fails over plain `http://localhost:3000`. Use
   `development` for local work.
@@ -145,6 +151,6 @@ Each of these cost real debugging time. Don't rediscover them.
 
 ## Secrets
 
-`REELROOM_PIN` and `SESSION_SECRET` live in `.env` (gitignored). `.env.example` is committed and must
+`SUNFLIX_PIN` and `SESSION_SECRET` live in `.env` (gitignored). `.env.example` is committed and must
 only ever hold placeholders. The server refuses to boot with `NODE_ENV=production` while the PIN is
 still the default `1234`, or with no `SESSION_SECRET` — keep both guards.

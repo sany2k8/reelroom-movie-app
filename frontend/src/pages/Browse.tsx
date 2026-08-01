@@ -54,7 +54,7 @@ export function Browse() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [view, setView] = useState<"grid" | "list">(
-    () => (localStorage.getItem("reelroom:view") as "grid" | "list") ?? "grid",
+    () => (localStorage.getItem("sunflix:view") as "grid" | "list") ?? "grid",
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -68,7 +68,7 @@ export function Browse() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("reelroom:view", view);
+    localStorage.setItem("sunflix:view", view);
   }, [view]);
 
   const query = useMemo(

@@ -5,7 +5,7 @@ import { FilmIcon } from "@/components/Icons";
 export function Login() {
   const login = useSession((s) => s.login);
   const error = useSession((s) => s.error);
-  const [name, setName] = useState(() => localStorage.getItem("reelroom:lastProfile") ?? "");
+  const [name, setName] = useState(() => localStorage.getItem("sunflix:lastProfile") ?? "");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -15,7 +15,7 @@ export function Login() {
     try {
       await login(name, pin);
       // Only the display name is remembered — never the PIN.
-      localStorage.setItem("reelroom:lastProfile", name.trim());
+      localStorage.setItem("sunflix:lastProfile", name.trim());
     } catch {
       setPin("");
     } finally {
@@ -42,7 +42,7 @@ export function Login() {
             <FilmIcon className="h-6 w-6" />
           </div>
           <h1 className="font-display text-4xl tracking-wider">
-            REEL<span className="text-amber">ROOM</span>
+            Sun<span className="text-amber">Flix</span>
           </h1>
           <p className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
             your private screening room

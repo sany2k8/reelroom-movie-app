@@ -1,8 +1,8 @@
 {
-  "name": "reelroom",
+  "name": "sunflix",
   "version": "2.0.0",
   "private": true,
-  "description": "Reelroom — a private, production-shaped streaming app for your own movie files",
+  "description": "SunFlix — a private, production-shaped streaming app for your own movie files",
   "scripts": {
     "setup": "npm --prefix backend install && npm --prefix frontend install",
     "build": "npm --prefix frontend run build",

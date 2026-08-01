@@ -4,7 +4,7 @@ import { db } from "../db/index.js";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 
-export const SESSION_COOKIE = "reelroom_session";
+export const SESSION_COOKIE = "sunflix_session";
 
 // Hashed once at boot so PIN checks are constant-time-ish and the plaintext
 // never sits in a comparison. The PIN itself still only lives in the env.

@@ -1,8 +1,8 @@
 services:
-  reelroom:
+  sunflix:
     build: .
-    image: reelroom:2.0.0
-    container_name: reelroom
+    image: sunflix:2.0.0
+    container_name: sunflix
     restart: unless-stopped
     # 3000 on the host is what ngrok/cloudflared already point at.
     ports:
@@ -10,7 +10,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      REELROOM_PIN: ${REELROOM_PIN:?set REELROOM_PIN in .env}
+      SUNFLIX_PIN: ${SUNFLIX_PIN:?set SUNFLIX_PIN in .env}
       SESSION_SECRET: ${SESSION_SECRET:?generate with openssl rand -hex 32}
       TMDB_API_KEY: ${TMDB_API_KEY:-}
       TRUST_PROXY: "true"
@@ -20,7 +20,7 @@ services:
       - ./posters:/app/posters:ro
       - ./movies.json:/app/movies.json:ro
       # SQLite, the TMDB cache and the catalog snapshot must survive restarts.
-      - reelroom-data:/app/data
+      - sunflix-data:/app/data
     # Node + a whole-library scan is comfortable well under this; the cap just
     # stops a runaway from squeezing everything else on the machine.
     mem_limit: 512m
@@ -36,4 +36,4 @@ services:
       start_period: 20s
 
 volumes:
-  reelroom-data:
+  sunflix-data:

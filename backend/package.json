@@ -1,7 +1,7 @@
 {
-  "name": "reelroom-backend",
+  "name": "sunflix-backend",
   "version": "2.0.0",
-  "description": "Reelroom API — catalog, TMDB enrichment, auth and range-request streaming",
+  "description": "SunFlix API — catalog, TMDB enrichment, auth and range-request streaming",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

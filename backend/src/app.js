@@ -138,7 +138,7 @@ function serveFrontend(app) {
         .status(503)
         .type("html")
         .send(
-          "<h1>Reelroom</h1><p>Frontend build not found. Run <code>npm --prefix frontend run build</code>, or use the Vite dev server on :5173.</p>",
+          "<h1>SunFlix</h1><p>Frontend build not found. Run <code>npm --prefix frontend run build</code>, or use the Vite dev server on :5173.</p>",
         );
     });
     return;

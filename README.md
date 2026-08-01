@@ -1,6 +1,6 @@
-# Reelroom
+# SunFlix
 
-A private streaming app for your own movie files. Drop videos into `movies/`, and Reelroom reads
+A private streaming app for your own movie files. Drop videos into `movies/`, and SunFlix reads
 them, enriches them from TMDB, and serves a modern browsing-and-playback experience — behind a PIN,
 so it stays yours even when you expose it through ngrok or cloudflared.
 
@@ -36,7 +36,7 @@ flowchart LR
     TMDB --> CACHE[(data/tmdb + data/images)]
     CAT --> SNAP[(data/catalog.json)]
 
-    AUTH --> DB[(SQLite<br/>data/reelroom.db)]
+    AUTH --> DB[(SQLite<br/>data/sunflix.db)]
     LIB --> DB
     STR -->|206 byte ranges| FS
 
@@ -98,7 +98,7 @@ Edit `.env` and set:
 
 | Key | Notes |
 |---|---|
-| `REELROOM_PIN` | The Room PIN on the login screen. Change it before tunnelling. |
+| `SUNFLIX_PIN` | The Room PIN on the login screen. Change it before tunnelling. |
 | `SESSION_SECRET` | `openssl rand -hex 32`. Rotating it signs everyone out. |
 | `TMDB_API_KEY` | Optional but recommended — see [Where each field comes from](#where-each-field-comes-from). |
 
@@ -200,6 +200,10 @@ docker compose up --build
 
 ## Exposing it over a tunnel
 
+> **Tunnel port 3000, not 5192.** 3000 is the backend serving the built UI. 5192 is the Vite dev
+> server — see [Blocked request](#blocked-request-this-host-is-not-allowed) below for what happens if
+> you point a tunnel at it.
+
 Start the app on :3000 first (`npm run serve`), then put a tunnel in front of it. Either tool works;
 both terminate TLS for you, which is why `TRUST_PROXY=true` is the default.
 
@@ -219,15 +223,15 @@ cloudflared tunnel login
 ```
 
 ```bash
-cloudflared tunnel create reelroom
+cloudflared tunnel create sunflix
 ```
 
 ```bash
-cloudflared tunnel route dns reelroom reelroom.yourdomain.com
+cloudflared tunnel route dns sunflix sunflix.yourdomain.com
 ```
 
 ```bash
-cloudflared tunnel run --url http://localhost:3000 reelroom
+cloudflared tunnel run --url http://localhost:3000 sunflix
 ```
 
 **ngrok** — same idea:
@@ -238,7 +242,7 @@ ngrok http 3000
 
 ### Before you share the link
 
-1. **Change `REELROOM_PIN` in `.env`** and restart. The default `1234` is for local testing only.
+1. **Change `SUNFLIX_PIN` in `.env`** and restart. The default `1234` is for local testing only.
 2. Keep `NODE_ENV=development` unless you have a reason to switch — in `production` the session
    cookie becomes secure-only, which is correct over the https tunnel but breaks sign-in over plain
    `http://localhost:3000`.
@@ -247,6 +251,42 @@ ngrok http 3000
 
 The PIN gate covers everything including `/api/stream`, `/api/download` and `/posters`, so a leaked
 tunnel URL alone gets nobody in. Sign-in is rate-limited to 10 attempts per 15 minutes per IP.
+
+### "Blocked request. This host is not allowed."
+
+```
+Blocked request. This host ("xyz.trycloudflare.com") is not allowed.
+To allow this host, add "xyz.trycloudflare.com" to `server.allowedHosts` in vite.config.js.
+```
+
+That message comes from **Vite**, which means the tunnel is pointed at **:5192** rather than **:3000**.
+Vite 5.4.12+ rejects unrecognised `Host` headers to block DNS rebinding, so a tunnel hostname is
+refused. It can appear "suddenly" on a setup that used to work — the trigger is Vite being upgraded,
+not anything about the tunnel.
+
+**The fix is to tunnel the right port:**
+
+```bash
+npm run serve
+```
+
+```bash
+cloudflared tunnel --url http://localhost:3000
+```
+
+That serves the built, minified UI from the backend — which is what you want in front of other people
+anyway: no source maps of your code, no HMR websocket, and faster.
+
+**If you deliberately want to share a hot-reloading dev session**, `vite.config.ts` already allows the
+cloudflared and ngrok domains, so you only need to tell HMR it is behind https:
+
+```bash
+TUNNEL=1 npm run dev
+```
+
+Without `TUNNEL=1` the page reload-loops, because the browser tries `ws://<tunnel-host>:5192` for HMR.
+The allowlist is scoped to tunnel providers rather than set to `true`, so the rebinding protection
+still applies to every other host.
 
 ## Adding films
 
