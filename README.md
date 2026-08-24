@@ -1,292 +1,45 @@
-# SunFlix
+# ReelRoom Movie App
 
-A private streaming app for your own movie files. Drop videos into `movies/`, and SunFlix reads
-them, enriches them from TMDB, and serves a modern browsing-and-playback experience — behind a PIN,
-so it stays yours even when you expose it through ngrok or cloudflared.
+A simple movie app to browse and search movies. This repository contains the source for the ReelRoom frontend and/or backend (depending on the project layout).
 
-Built to be *shaped* like a production streaming site (hero carousel, faceted browse, custom player,
-per-profile watch state) while running entirely on one machine.
+<img width="1815" height="812" alt="frontend" src="https://github.com/user-attachments/assets/78fc2b51-8926-440c-8507-b9f8afb70c41" />
 
-## Stack
+## Features
+- Browse movies
+- Search by title
+- Details and trailers (if available)
+- Stream with all video player controls
 
-| Layer | Choice |
-|---|---|
-| API | Node 20+, Express 4, ESM |
-| Data | SQLite via `better-sqlite3` (WAL), append-only migrations |
-| Media | HTTP range streaming; `ffprobe` for duration/resolution/audio |
-| Metadata | TMDB v3, cached to disk (JSON + images) |
-| Auth | Shared room PIN → hashed session token in an httpOnly cookie |
-| UI | React 18 + TypeScript (strict) + Vite + Tailwind + react-router + zustand |
-| Hardening | helmet CSP, rate limiting, compression, `pino` structured logs |
+## Quick start
 
-## Architecture
+Prerequisites:
+- Node.js 16+ (if this is a Node project)
+- npm or yarn
 
-```mermaid
-flowchart LR
-    UI[React + Vite<br/>:5192 dev / dist in prod] -->|/api| API[Express<br/>:3000]
-
-    API --> AUTH[auth<br/>PIN + sessions]
-    API --> CAT[catalog service]
-    API --> LIB[library service]
-    API --> STR[stream routes]
-
-    CAT --> FS[(movies/ + posters/)]
-    CAT --> PROBE[ffprobe]
-    CAT --> TMDB[TMDB API]
-    TMDB --> CACHE[(data/tmdb + data/images)]
-    CAT --> SNAP[(data/catalog.json)]
-
-    AUTH --> DB[(SQLite<br/>data/sunflix.db)]
-    LIB --> DB
-    STR -->|206 byte ranges| FS
-
-    TUNNEL[ngrok / cloudflared] --> API
-```
-
-The catalog lives in memory, rebuilt from disk on boot and snapshotted to `data/catalog.json` so
-restarts are instant. SQLite holds only what is per-person: profiles, sessions, watch progress,
-watchlist, favourites, player preferences.
-
-### Playback and resume
-
-```mermaid
-sequenceDiagram
-    participant B as Browser
-    participant A as Express
-    participant D as SQLite
-    participant F as movies/
-
-    B->>A: GET /api/movies/:id  (session cookie)
-    A->>D: progress + list flags for this profile
-    A-->>B: movie + progress.position
-
-    Note over B: player offers "Resume at 31:31"
-
-    B->>A: GET /api/stream/:id   Range: bytes=0-
-    A->>F: createReadStream(start, end)
-    A-->>B: 206 Partial Content
-
-    loop every 10s while playing
-        B->>A: PUT /api/library/progress/:id
-        A->>D: upsert position/duration
-    end
-
-    Note over B: tab closes
-    B->>A: sendBeacon POST /api/library/progress/:id
-    A->>D: final position
-```
-
-## Setup
-
-### Prerequisites
-
-- **Node 20+** (`node -v`)
-- **ffmpeg**, which provides `ffprobe` — `brew install ffmpeg`. Optional but strongly recommended:
-  without it you lose real durations, resolution and the quality badges.
-
-### Step 0 — shared config (do this once, before either app)
-
-Both apps read the **same `.env` at the project root**. There is no `backend/.env` or
-`frontend/.env` — the backend resolves the root path itself, so it works no matter which directory
-you launch it from.
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set:
-
-| Key | Notes |
-|---|---|
-| `SUNFLIX_PIN` | The Room PIN on the login screen. Change it before tunnelling. |
-| `SESSION_SECRET` | `openssl rand -hex 32`. Rotating it signs everyone out. |
-| `TMDB_API_KEY` | Optional but recommended — see [Where each field comes from](#where-each-field-comes-from). |
-
-### Backend (API, port 3000)
-
-```bash
-cd backend
-```
+Install dependencies
 
 ```bash
 npm install
+# or
+# yarn install
 ```
+
+Run the project (example)
 
 ```bash
-npm run dev
+npm start
+# or
+# npm run dev
 ```
 
-`npm run dev` uses `node --watch` and restarts on save. For production, `npm start` instead.
-
-Verify it on its own, without the UI:
+Run tests
 
 ```bash
-curl -s http://localhost:3000/api/health
+npm test
 ```
 
-You should get `status: ok`, a catalog count, and whether TMDB is enabled. `PORT=3011 npm run dev`
-moves it if 3000 is taken.
-
-The backend is **self-sufficient**: it scans your films, serves the API, and — if `frontend/dist`
-exists — serves the built UI too. You do not need the frontend dev server running to use the app.
-
-### Frontend (UI, port 5192)
-
-```bash
-cd frontend
-```
-
-```bash
-npm install
-```
-
-```bash
-npm run dev
-```
-
-Open **http://localhost:5192**. Vite proxies `/api` and `/posters` to the backend on **:3000**, so
-the backend must already be running or every request 502s.
-
-If you moved the backend port, point the proxy at it:
-
-```bash
-API_PORT=3011 npm run dev
-```
-
-Other frontend commands:
-
-```bash
-npm run typecheck    # tsc --noEmit — the gate; must pass
-```
-
-```bash
-npm run build        # emits frontend/dist, which the backend then serves
-```
-
-### Which mode do I want?
-
-|  | Two servers (dev) | One server (production-style) |
-|---|---|---|
-| Commands | `backend: npm run dev` + `frontend: npm run dev` | `npm run build` in `frontend/`, then `npm start` in `backend/` |
-| Open | http://localhost:5192 | http://localhost:3000 |
-| Hot reload | yes | no — rebuild to see changes |
-| **Use this for tunnelling** | no | **yes** — tunnel :3000 |
-
-### Root shortcuts
-
-From the project root, these just wrap the per-app commands above:
-
-```bash
-npm run setup      # npm install in both
-```
-
-```bash
-npm run serve      # build the UI, then start the API on :3000
-```
-
-```bash
-npm run dev:api    # same as: cd backend && npm run dev
-```
-
-```bash
-npm run dev:ui     # same as: cd frontend && npm run dev
-```
-
-**Docker** (builds both, one container, :3000):
-
-```bash
-docker compose up --build
-```
-
-## Exposing it over a tunnel
-
-> **Tunnel port 3000, not 5192.** 3000 is the backend serving the built UI. 5192 is the Vite dev
-> server — see [Blocked request](#blocked-request-this-host-is-not-allowed) below for what happens if
-> you point a tunnel at it.
-
-Start the app on :3000 first (`npm run serve`), then put a tunnel in front of it. Either tool works;
-both terminate TLS for you, which is why `TRUST_PROXY=true` is the default.
-
-**cloudflared** — free, no account needed for a quick share:
-
-```bash
-cloudflared tunnel --url http://localhost:3000
-```
-
-It prints a `https://<random-words>.trycloudflare.com` URL. That address is ephemeral — it changes
-every restart. Install it with `brew install cloudflared`.
-
-For a URL that survives restarts, you need a Cloudflare account and a domain on it:
-
-```bash
-cloudflared tunnel login
-```
-
-```bash
-cloudflared tunnel create sunflix
-```
-
-```bash
-cloudflared tunnel route dns sunflix sunflix.yourdomain.com
-```
-
-```bash
-cloudflared tunnel run --url http://localhost:3000 sunflix
-```
-
-**ngrok** — same idea:
-
-```bash
-ngrok http 3000
-```
-
-### Before you share the link
-
-1. **Change `SUNFLIX_PIN` in `.env`** and restart. The default `1234` is for local testing only.
-2. Keep `NODE_ENV=development` unless you have a reason to switch — in `production` the session
-   cookie becomes secure-only, which is correct over the https tunnel but breaks sign-in over plain
-   `http://localhost:3000`.
-3. Your **upload bandwidth is the bottleneck**, not this server. There's no transcoding, so a 1080p
-   file streams at its full bitrate to every viewer at once.
-
-The PIN gate covers everything including `/api/stream`, `/api/download` and `/posters`, so a leaked
-tunnel URL alone gets nobody in. Sign-in is rate-limited to 10 attempts per 15 minutes per IP.
-
-### "Blocked request. This host is not allowed."
-
-```
-Blocked request. This host ("xyz.trycloudflare.com") is not allowed.
-To allow this host, add "xyz.trycloudflare.com" to `server.allowedHosts` in vite.config.js.
-```
-
-That message comes from **Vite**, which means the tunnel is pointed at **:5192** rather than **:3000**.
-Vite 5.4.12+ rejects unrecognised `Host` headers to block DNS rebinding, so a tunnel hostname is
-refused. It can appear "suddenly" on a setup that used to work — the trigger is Vite being upgraded,
-not anything about the tunnel.
-
-**The fix is to tunnel the right port:**
-
-```bash
-npm run serve
-```
-
-```bash
-cloudflared tunnel --url http://localhost:3000
-```
-
-That serves the built, minified UI from the backend — which is what you want in front of other people
-anyway: no source maps of your code, no HMR websocket, and faster.
-
-**If you deliberately want to share a hot-reloading dev session**, `vite.config.ts` already allows the
-cloudflared and ngrok domains, so you only need to tell HMR it is behind https:
-
-```bash
-TUNNEL=1 npm run dev
-```
-
-Without `TUNNEL=1` the page reload-loops, because the browser tries `ws://<tunnel-host>:5192` for HMR.
-The allowlist is scoped to tunnel providers rather than set to `true`, so the rebinding protection
-still applies to every other host.
+## Contributing
+Thanks for your interest in contributing! See CONTRIBUTING.md for details on how to contribute.
 
 ## Adding films
 
