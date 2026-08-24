@@ -16,3 +16,5 @@ posters/*
 *.log
 .DS_Store
 backdated_commit.sh
+.claude/*
+CLAUDE.md
