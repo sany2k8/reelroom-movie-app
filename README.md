@@ -2,12 +2,13 @@
 
 A simple movie app to browse and search movies. This repository contains the source for the ReelRoom frontend and/or backend (depending on the project layout).
 
-Status: Work in progress
+<img width="1815" height="812" alt="frontend" src="https://github.com/user-attachments/assets/78fc2b51-8926-440c-8507-b9f8afb70c41" />
 
 ## Features
 - Browse movies
 - Search by title
 - Details and trailers (if available)
+- Stream with all video player controls
 
 ## Quick start
 
