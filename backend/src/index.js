@@ -4,13 +4,17 @@ import { logger } from "./logger.js";
 // Importing the db module runs the migrations, which every service depends on.
 import { pruneExpiredSessions, db } from "./db/index.js";
 import { initCatalog } from "./services/catalog.js";
+import { initStorage } from "./storage/index.js";
+import { startWatcher, stopWatcher } from "./services/watcher.js";
 import { tmdbEnabled } from "./services/tmdb.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 
 async function main() {
   pruneExpiredSessions();
+  await initStorage();
   await initCatalog();
+  startWatcher();
 
   const app = createApp();
   const server = app.listen(config.port, () => {
@@ -35,6 +39,7 @@ async function main() {
 
   const shutdown = (signal) => {
     logger.info({ signal }, "shutdown.start");
+    stopWatcher();
     server.close(() => {
       db.close();
       logger.info("shutdown.complete");

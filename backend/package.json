@@ -1,13 +1,14 @@
 {
   "name": "sunflix-backend",
   "version": "2.0.0",
-  "description": "SunFlix API — catalog, TMDB enrichment, auth and range-request streaming",
+  "description": "SunFlix API \u2014 catalog, TMDB enrichment, auth and range-request streaming",
   "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "rescan": "node src/scripts/rescan.js"
+    "rescan": "node src/scripts/rescan.js",
+    "make-admin": "node src/scripts/make-admin.js"
   },
   "engines": {
     "node": ">=20"

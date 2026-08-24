@@ -2,6 +2,53 @@ export interface Profile {
   id: number;
   name: string;
   avatarSeed: string;
+  isAdmin?: boolean;
+  createdAt?: string;
+}
+
+export interface MovieRequest {
+  id: number;
+  title: string;
+  year: number | null;
+  note: string | null;
+  status: "open" | "fulfilled" | "declined";
+  movieId: string | null;
+  requester: string | null;
+  profileId: number;
+  votes: number;
+  hasVoted: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface AdminOverview {
+  profile: Profile;
+  catalog: {
+    lastScan: string | null;
+    scanning: boolean;
+    count: number;
+    totalBytes: number;
+    missingArtwork: number;
+    noSubtitles: number;
+    unmatched: { id: string; title: string; file: string }[];
+    unplayable: { id: string; title: string; container: string }[];
+  };
+  storage: { driver: string; location: string };
+  tmdb: string;
+  watch: { enabled: boolean; stableSeconds: number; pollSeconds: number };
+  openRequests: number;
+  profiles: Profile[];
+  recentActivity: { movieId: string; title: string; who: string; percent: number; at: string }[];
+}
+
+export interface AdminSession {
+  id: string;
+  token: string;
+  profileId: number;
+  name: string;
+  userAgent: string | null;
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface Progress {

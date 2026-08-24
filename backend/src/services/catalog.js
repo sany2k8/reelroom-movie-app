@@ -2,6 +2,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
+import { getStorage } from "../storage/index.js";
 import { logger } from "../logger.js";
 import { probe, qualityLabel } from "./media.js";
 import { searchMovie, movieDetails, shapeDetails, tmdbEnabled } from "./tmdb.js";
@@ -103,22 +104,14 @@ async function readOverrides() {
 }
 
 async function listVideoFiles() {
-  try {
-    const entries = await fsp.readdir(config.paths.movies, { withFileTypes: true });
-    return entries
-      .filter((e) => e.isFile() && VIDEO_EXTENSIONS.has(path.extname(e.name).toLowerCase()))
-      .map((e) => e.name)
-      .sort((a, b) => a.localeCompare(b));
-  } catch (err) {
-    logger.error({ err: err.message, dir: config.paths.movies }, "catalog.movies_dir_unreadable");
-    return [];
-  }
+  const entries = await getStorage().list();
+  return entries.sort((a, b) => a.key.localeCompare(b.key));
 }
 
 async function findSubtitles(videoFile) {
   const base = path.basename(videoFile, path.extname(videoFile));
   try {
-    const entries = await fsp.readdir(config.paths.movies);
+    const entries = await getStorage().listAll();
     return entries
       .filter((name) => {
         const ext = path.extname(name).toLowerCase();
@@ -127,12 +120,7 @@ async function findSubtitles(videoFile) {
       .map((name) => {
         const withoutExt = path.basename(name, path.extname(name));
         const tag = withoutExt.slice(base.length).replace(/^[.\-_]/, "");
-        const lang = tag || "en";
-        return {
-          lang,
-          label: tag ? tag.toUpperCase() : "English",
-          file: name,
-        };
+        return { lang: tag || "en", label: tag ? tag.toUpperCase() : "English", file: name };
       });
   } catch {
     return [];
@@ -157,9 +145,8 @@ function findLocalPoster(override, title, videoFile) {
   return null;
 }
 
-async function buildEntry(videoFile, overridesByFile, previousById) {
-  const fullPath = path.join(config.paths.movies, videoFile);
-  const stat = await fsp.stat(fullPath);
+async function buildEntry(entry, overridesByFile, previousById) {
+  const videoFile = entry.key;
   const override = overridesByFile.get(videoFile.toLowerCase()) ?? {};
 
   const parsed = parseFilename(videoFile);
@@ -169,13 +156,13 @@ async function buildEntry(videoFile, overridesByFile, previousById) {
 
   const previous = previousById.get(id);
   const unchanged =
-    previous && previous.file === videoFile && previous.sizeBytes === stat.size && previous.tmdbId;
+    previous && previous.file === videoFile && previous.sizeBytes === entry.size && previous.tmdbId;
 
   // A file that hasn't changed keeps its enrichment — a rescan of a big library
   // shouldn't re-probe and re-fetch everything.
   const technical = unchanged
     ? previous.technical
-    : (await probe(fullPath)) ?? previous?.technical ?? null;
+    : (await probe(await getStorage().probeInput(videoFile))) ?? previous?.technical ?? null;
 
   let tmdb = unchanged ? previous.tmdb : null;
   if (!tmdb && tmdbEnabled() && override.tmdb !== false) {
@@ -212,8 +199,8 @@ async function buildEntry(videoFile, overridesByFile, previousById) {
     year: year ?? (tmdb?.releaseDate ? Number(tmdb.releaseDate.slice(0, 4)) : null),
     sortTitle: title.replace(/^(the|a|an)\s+/i, "").toLowerCase(),
     file: videoFile,
-    sizeBytes: stat.size,
-    addedAt: stat.mtime.toISOString(),
+    sizeBytes: entry.size,
+    addedAt: new Date(entry.mtime).toISOString(),
 
     description: override.description ?? tmdb?.overview ?? null,
     tagline: tmdb?.tagline ?? null,
@@ -296,11 +283,11 @@ export async function scan({ force = false } = {}) {
     const previousById = new Map((snapshot.movies ?? []).map((m) => [m.id, m]));
 
     const built = [];
-    for (const file of files) {
+    for (const entry of files) {
       try {
-        built.push(await buildEntry(file, overridesByFile, previousById));
+        built.push(await buildEntry(entry, overridesByFile, previousById));
       } catch (err) {
-        logger.error({ err: err.message, file }, "catalog.entry_failed");
+        logger.error({ err: err.message, file: entry.key }, "catalog.entry_failed");
       }
     }
 

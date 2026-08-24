@@ -1,4 +1,7 @@
 import type {
+  AdminOverview,
+  AdminSession,
+  MovieRequest,
   Facets,
   HomePayload,
   ListName,
@@ -102,6 +105,56 @@ export const api = {
     }),
 
   prefs: () => request<PlayerPrefs>("/library/prefs"),
+
+  requests: (status?: string) =>
+    request<{ items: MovieRequest[] }>(`/requests${status ? `?status=${status}` : ""}`),
+
+  createRequest: (body: { title: string; year?: number | null; note?: string }) =>
+    request<MovieRequest>("/requests", { method: "POST", body: JSON.stringify(body) }),
+
+  voteRequest: (id: number, active: boolean) =>
+    request<{ active: boolean }>(`/requests/${id}/vote`, {
+      method: "PUT",
+      body: JSON.stringify({ active }),
+    }),
+
+  deleteRequest: (id: number) =>
+    request<{ removed: boolean }>(`/requests/${id}`, { method: "DELETE" }),
+
+  setRequestStatus: (id: number, status: string, movieId?: string | null) =>
+    request<MovieRequest>(`/requests/${id}/status`, {
+      method: "PUT",
+      body: JSON.stringify({ status, movieId }),
+    }),
+
+  adminOverview: () => request<AdminOverview>("/admin/overview"),
+
+  adminRescan: (force = false) =>
+    request<{ count: number }>(`/admin/rescan${force ? "?force=true" : ""}`, { method: "POST" }),
+
+  adminCheckNow: () => request<{ count: number }>("/admin/check-now", { method: "POST" }),
+
+  adminSessions: () => request<{ items: AdminSession[] }>("/admin/sessions"),
+
+  adminRevokeSession: (token: string) =>
+    request<{ revoked: boolean }>(`/admin/sessions/${encodeURIComponent(token)}`, {
+      method: "DELETE",
+    }),
+
+  adminRevokeProfile: (id: number) =>
+    request<{ revoked: number }>(`/admin/profiles/${id}/sessions`, { method: "DELETE" }),
+
+  adminSetAdmin: (id: number, isAdmin: boolean) =>
+    request<{ isAdmin: boolean }>(`/admin/profiles/${id}/admin`, {
+      method: "PUT",
+      body: JSON.stringify({ isAdmin }),
+    }),
+
+  adminOverride: (id: string, patch: Record<string, unknown>) =>
+    request<{ movie: Movie }>(`/admin/movies/${encodeURIComponent(id)}/override`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    }),
 
   savePrefs: (prefs: PlayerPrefs) =>
     request<PlayerPrefs>("/library/prefs", { method: "PUT", body: JSON.stringify(prefs) }),

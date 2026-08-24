@@ -12,9 +12,15 @@ const pinHash = bcrypt.hashSync(config.pin, 10);
 
 const statements = {
   findProfile: db.prepare("SELECT * FROM profiles WHERE name = ? COLLATE NOCASE"),
-  insertProfile: db.prepare("INSERT INTO profiles (name, avatar_seed) VALUES (?, ?)"),
+  insertProfile: db.prepare(
+    "INSERT INTO profiles (name, avatar_seed, is_admin) VALUES (?, ?, ?)",
+  ),
+  countProfiles: db.prepare("SELECT COUNT(*) AS n FROM profiles"),
+  setAdmin: db.prepare("UPDATE profiles SET is_admin = ? WHERE id = ?"),
   getProfile: db.prepare("SELECT * FROM profiles WHERE id = ?"),
-  listProfiles: db.prepare("SELECT id, name, avatar_seed FROM profiles ORDER BY created_at"),
+  listProfiles: db.prepare(
+    "SELECT id, name, avatar_seed, is_admin, created_at FROM profiles ORDER BY created_at",
+  ),
   insertSession: db.prepare(
     "INSERT INTO sessions (token, profile_id, user_agent, expires_at) VALUES (?, ?, ?, ?)",
   ),
@@ -38,13 +44,24 @@ export function findOrCreateProfile(name) {
   if (existing) return existing;
 
   const seed = crypto.randomBytes(4).toString("hex");
-  const { lastInsertRowid } = statements.insertProfile.run(trimmed, seed);
-  logger.info({ profile: trimmed }, "auth.profile_created");
+  // Whoever signs in first owns the room; they can promote others later.
+  const isFirst = statements.countProfiles.get().n === 0;
+  const { lastInsertRowid } = statements.insertProfile.run(trimmed, seed, isFirst ? 1 : 0);
+  logger.info({ profile: trimmed, admin: isFirst }, "auth.profile_created");
   return statements.getProfile.get(lastInsertRowid);
 }
 
 export const listProfiles = () =>
-  statements.listProfiles.all().map((p) => ({ id: p.id, name: p.name, avatarSeed: p.avatar_seed }));
+  statements.listProfiles.all().map((p) => ({
+    id: p.id,
+    name: p.name,
+    avatarSeed: p.avatar_seed,
+    isAdmin: Boolean(p.is_admin),
+    createdAt: p.created_at,
+  }));
+
+export const setProfileAdmin = (profileId, isAdmin) =>
+  statements.setAdmin.run(isAdmin ? 1 : 0, profileId).changes > 0;
 
 export function createSession(profileId, userAgent) {
   const token = crypto.randomBytes(32).toString("base64url");
@@ -60,7 +77,12 @@ export function resolveSession(token) {
   if (!row) return null;
   const profile = statements.getProfile.get(row.profile_id);
   if (!profile) return null;
-  return { id: profile.id, name: profile.name, avatarSeed: profile.avatar_seed };
+  return {
+    id: profile.id,
+    name: profile.name,
+    avatarSeed: profile.avatar_seed,
+    isAdmin: Boolean(profile.is_admin),
+  };
 }
 
 export const destroySession = (token) =>

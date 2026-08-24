@@ -32,7 +32,7 @@ export function Layout() {
         <div className="mx-auto flex max-w-[1600px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-baseline gap-2">
             <span className="font-display text-xl tracking-wider">
-              REEL<span className="text-amber">ROOM</span>
+              SUN<span className="text-amber">FLIX</span>
             </span>
             <span className="text-[11px] uppercase tracking-[0.2em] text-muted">
               your private screening room

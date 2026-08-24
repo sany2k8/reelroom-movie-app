@@ -14,3 +14,17 @@ export function requireAuth(req, res, next) {
   if (req.profile) return next();
   res.status(401).json({ error: "Not signed in", code: "UNAUTHENTICATED" });
 }
+
+/**
+ * Admin owns the library itself — rescans, metadata fixes, session revocation.
+ * Separate from requireAuth so a guest on the tunnel can never reach it.
+ */
+export function requireAdmin(req, res, next) {
+  if (!req.profile) {
+    return res.status(401).json({ error: "Not signed in", code: "UNAUTHENTICATED" });
+  }
+  if (!req.profile.isAdmin) {
+    return res.status(403).json({ error: "Admins only", code: "FORBIDDEN" });
+  }
+  next();
+}

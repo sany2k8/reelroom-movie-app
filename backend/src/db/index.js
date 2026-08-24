@@ -61,6 +61,44 @@ const MIGRATIONS = [
      rate       REAL NOT NULL DEFAULT 1,
      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
    );`,
+
+  // The first profile to sign in owns the room; it can promote others.
+  `ALTER TABLE profiles ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0;`,
+
+  `CREATE TABLE IF NOT EXISTS requests (
+     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+     profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+     title       TEXT NOT NULL,
+     year        INTEGER,
+     note        TEXT,
+     status      TEXT NOT NULL DEFAULT 'open'
+                 CHECK (status IN ('open', 'fulfilled', 'declined')),
+     movie_id    TEXT,
+     resolved_by INTEGER REFERENCES profiles(id) ON DELETE SET NULL,
+     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+     resolved_at TEXT
+   );`,
+
+  `CREATE INDEX IF NOT EXISTS idx_requests_status ON requests (status, created_at DESC);`,
+
+  // One open request per title per person; re-asking bumps nothing.
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_requests_unique_open
+     ON requests (profile_id, title COLLATE NOCASE)
+     WHERE status = 'open';`,
+
+  `CREATE TABLE IF NOT EXISTS request_votes (
+     request_id INTEGER NOT NULL REFERENCES requests(id) ON DELETE CASCADE,
+     profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+     PRIMARY KEY (request_id, profile_id)
+   );`,
+
+  // Profiles that existed before is_admin arrived all defaulted to 0, which
+  // would leave an established install with no way into the admin panel.
+  // Promote the oldest profile, but only if nobody is an admin already.
+  `UPDATE profiles SET is_admin = 1
+    WHERE id = (SELECT id FROM profiles ORDER BY created_at, id LIMIT 1)
+      AND NOT EXISTS (SELECT 1 FROM profiles WHERE is_admin = 1);`,
 ];
 
 /**

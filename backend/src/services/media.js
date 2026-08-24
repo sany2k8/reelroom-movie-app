@@ -22,7 +22,7 @@ async function hasFfprobe() {
  * Reads real duration/resolution off the file so the UI never has to trust a
  * hand-typed "152 min" that drifted from the actual encode.
  */
-export async function probe(filePath) {
+export async function probe(input) {
   if (!(await hasFfprobe())) return null;
 
   try {
@@ -33,9 +33,11 @@ export async function probe(filePath) {
         "-print_format", "json",
         "-show_format",
         "-show_streams",
-        filePath,
+        // Remote inputs are presigned https URLs; ffprobe range-requests the
+        // moov atom rather than downloading the whole object.
+        input,
       ],
-      { maxBuffer: 4 * 1024 * 1024 },
+      { maxBuffer: 4 * 1024 * 1024, timeout: 120_000 },
     );
 
     const data = JSON.parse(stdout);
@@ -57,7 +59,8 @@ export async function probe(filePath) {
       quality: qualityLabel(video?.height),
     };
   } catch (err) {
-    logger.warn({ err: err.message, filePath }, "media.probe_failed");
+    // Don't log a presigned URL — it is a credential.
+    logger.warn({ err: err.message }, "media.probe_failed");
     return null;
   }
 }

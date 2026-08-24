@@ -1,10 +1,10 @@
-import fs from "node:fs";
-import fsp from "node:fs/promises";
 import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import { Router } from "express";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
 import { getMovie } from "../services/catalog.js";
+import { getStorage } from "../storage/index.js";
 import { cachedImage } from "../services/tmdb.js";
 import { HttpError, asyncRoute } from "../middleware/errors.js";
 
@@ -19,76 +19,100 @@ const MIME = {
   ".avi": "video/x-msvideo",
 };
 
-/** Resolves a catalog id to a real file, refusing anything outside /movies. */
-function resolveMovieFile(id) {
+/** Resolves a catalog id to a storage key, and confirms the object still exists. */
+async function resolveMovie(id) {
   const movie = getMovie(id);
   if (!movie) throw new HttpError(404, "Movie not found", "NOT_FOUND");
 
-  const filePath = path.join(config.paths.movies, movie.file);
-  if (!path.resolve(filePath).startsWith(path.resolve(config.paths.movies))) {
-    throw new HttpError(400, "Invalid path", "BAD_PATH");
+  const storage = getStorage();
+  if (!(await storage.exists(movie.file))) {
+    throw new HttpError(404, "Video file is missing from storage", "FILE_MISSING");
   }
-  if (!fs.existsSync(filePath)) {
-    throw new HttpError(404, "Video file is missing from the movies folder", "FILE_MISSING");
-  }
-  return { movie, filePath };
+  return { movie, storage };
 }
 
-streamRouter.get("/stream/:id", (req, res) => {
-  const { movie, filePath } = resolveMovieFile(req.params.id);
-  const { size } = fs.statSync(filePath);
-  const contentType = MIME[path.extname(movie.file).toLowerCase()] ?? "application/octet-stream";
-  const range = req.headers.range;
+streamRouter.get(
+  "/stream/:id",
+  asyncRoute(async (req, res) => {
+    const { movie, storage } = await resolveMovie(req.params.id);
 
-  if (!range) {
-    res.writeHead(200, {
-      "Content-Length": size,
-      "Content-Type": contentType,
+    // Object stores can hand the player a presigned URL so the bytes never
+    // transit this server. Opt-in, because the URL is bearer-ish until it expires.
+    const direct = await storage.signedUrl(movie.file);
+    if (direct) return res.redirect(302, direct);
+
+    const stat = await storage.stat(movie.file);
+    const size = stat.size;
+    const contentType = MIME[path.extname(movie.file).toLowerCase()] ?? "application/octet-stream";
+    const range = req.headers.range;
+
+    if (!range) {
+      res.writeHead(200, {
+        "Content-Length": size,
+        "Content-Type": contentType,
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, max-age=0",
+      });
+      const stream = await storage.createReadStream(movie.file);
+      await pipeline(stream, res).catch(() => undefined);
+      return;
+    }
+
+    const [rawStart, rawEnd] = range.replace(/bytes=/, "").split("-");
+    const start = Number.parseInt(rawStart, 10) || 0;
+    const end = rawEnd ? Number.parseInt(rawEnd, 10) : size - 1;
+
+    if (Number.isNaN(start) || start >= size || end >= size || start > end) {
+      res.writeHead(416, { "Content-Range": `bytes */${size}` });
+      res.end();
+      return;
+    }
+
+    res.writeHead(206, {
+      "Content-Range": `bytes ${start}-${end}/${size}`,
       "Accept-Ranges": "bytes",
+      "Content-Length": end - start + 1,
+      "Content-Type": contentType,
       "Cache-Control": "private, max-age=0",
     });
-    fs.createReadStream(filePath).pipe(res);
-    return;
-  }
 
-  const [rawStart, rawEnd] = range.replace(/bytes=/, "").split("-");
-  const start = Number.parseInt(rawStart, 10) || 0;
-  const end = rawEnd ? Number.parseInt(rawEnd, 10) : size - 1;
+    const stream = await storage.createReadStream(movie.file, { start, end });
+    // Seeking aborts the previous request constantly; pipeline tears the read
+    // down with the response instead of leaking a handle per seek.
+    await pipeline(stream, res).catch((err) => {
+      if (!["ERR_STREAM_PREMATURE_CLOSE", "ECONNRESET", "EPIPE"].includes(err.code)) {
+        logger.warn({ err: err.message, id: req.params.id }, "stream.aborted");
+      }
+    });
+  }),
+);
 
-  if (Number.isNaN(start) || start >= size || end >= size || start > end) {
-    res.writeHead(416, { "Content-Range": `bytes */${size}` });
-    res.end();
-    return;
-  }
+streamRouter.get(
+  "/download/:id",
+  asyncRoute(async (req, res) => {
+    const { movie, storage } = await resolveMovie(req.params.id);
 
-  res.writeHead(206, {
-    "Content-Range": `bytes ${start}-${end}/${size}`,
-    "Accept-Ranges": "bytes",
-    "Content-Length": end - start + 1,
-    "Content-Type": contentType,
-    "Cache-Control": "private, max-age=0",
-  });
+    const direct = await storage.signedUrl(movie.file);
+    if (direct) return res.redirect(302, direct);
 
-  const stream = fs.createReadStream(filePath, { start, end });
-  stream.on("error", (err) => {
-    logger.error({ err: err.message, id: req.params.id }, "stream.read_failed");
-    res.destroy();
-  });
-  // Seeking aborts the previous request constantly; tear the read down with it.
-  req.on("close", () => stream.destroy());
-  stream.pipe(res);
-});
+    if (storage.kind === "local") {
+      return res.download(path.join(config.paths.movies, movie.file), movie.file);
+    }
 
-streamRouter.get("/download/:id", (req, res) => {
-  const { movie, filePath } = resolveMovieFile(req.params.id);
-  res.download(filePath, movie.file);
-});
+    const stat = await storage.stat(movie.file);
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(movie.file)}"`);
+    res.setHeader("Content-Length", stat.size);
+    res.setHeader("Content-Type", "application/octet-stream");
+    const stream = await storage.createReadStream(movie.file);
+    await pipeline(stream, res).catch(() => undefined);
+  }),
+);
 
 /** SRT is converted on the fly — browsers only understand WebVTT. */
 function srtToVtt(srt) {
   const body = srt
     .replace(/\r+/g, "")
-    .replace(/^\uFEFF/, "")
+    .replace(/^﻿/, "")
     .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
   return `WEBVTT\n\n${body}`;
 }
@@ -99,15 +123,12 @@ streamRouter.get(
     const movie = getMovie(req.params.id);
     if (!movie) throw new HttpError(404, "Movie not found", "NOT_FOUND");
 
+    // Only tracks the scanner already associated with this film are readable —
+    // the client never gets to name an arbitrary object.
     const track = movie.subtitles.find((s) => s.file === req.params.file);
     if (!track) throw new HttpError(404, "Subtitle track not found", "NOT_FOUND");
 
-    const filePath = path.join(config.paths.movies, track.file);
-    if (!path.resolve(filePath).startsWith(path.resolve(config.paths.movies))) {
-      throw new HttpError(400, "Invalid path", "BAD_PATH");
-    }
-
-    const raw = await fsp.readFile(filePath, "utf-8");
+    const raw = await getStorage().readText(track.file);
     res.type("text/vtt");
     res.send(path.extname(track.file).toLowerCase() === ".srt" ? srtToVtt(raw) : raw);
   }),

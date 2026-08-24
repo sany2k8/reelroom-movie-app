@@ -126,6 +126,17 @@ Each of these cost real debugging time. Don't rediscover them.
   `/api/download`. Compressing an already-compressed 2 GB file burns CPU for zero gain.
 - **Streaming is exempt from the rate limiter.** Seeking fires many small ranged requests; rate
   limiting them stalls playback.
+- **Never touch `fs` for media.** Everything media-related goes through
+  `storage/index.js` (`list`, `stat`, `createReadStream`, `readText`, `probeInput`, `signedUrl`).
+  Reaching for `fs.createReadStream` in a route is what makes the app local-only again. `movies.json`,
+  the TMDB cache and posters are app data, not media, and stay on the local disk deliberately.
+- **The import watcher must wait for a file to stop growing.** A copy fires a create event the
+  instant the file appears; probing then records the duration of a truncated file. `waitUntilStable`
+  polls the size and only imports once it has held steady for `WATCH_STABLE_SECONDS`.
+- **Admin bootstrap is a chicken-and-egg.** Admin can only be granted by an admin, so a migration
+  promotes the oldest profile, and `npm --prefix backend run make-admin -- <name>` is the escape
+  hatch when that is the wrong person. The migration only ever promotes — it must never demote, or a
+  restart could lock everyone out.
 - **Tunnel :3000, never :5192 — and "Blocked request" means someone did.** Vite 5.4.12+ refuses
   unrecognised `Host` headers (DNS-rebinding protection), so pointing cloudflared/ngrok at the dev
   server fails with *"This host is not allowed"*. It looks sudden because the trigger is a Vite

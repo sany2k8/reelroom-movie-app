@@ -323,6 +323,71 @@ Every field is optional. `id` sets the URL slug (omit it and one is derived from
 `"tmdb": false` opts a title out of enrichment entirely; `tmdbId` pins a specific match when the
 title search guesses wrong.
 
+## Storage
+
+Media lives behind a storage adapter, so moving from a folder to a bucket is config, not a rewrite.
+The catalog scanner, ffprobe, the streaming route and the import watcher all talk to the same
+interface.
+
+**Local (default)** — reads `MOVIES_DIR`:
+
+```bash
+STORAGE_DRIVER=local
+```
+
+**S3-compatible** — AWS S3, Cloudflare R2, MinIO or Backblaze B2. Install the SDK first:
+
+```bash
+npm --prefix backend install @aws-sdk/client-s3 @aws-sdk/s3-request-presigner
+```
+
+Then set `STORAGE_DRIVER=s3`, `S3_BUCKET`, credentials, and `S3_ENDPOINT` for anything that isn't
+AWS. ffprobe reads a presigned URL and range-requests only the header, so scanning doesn't download
+your library.
+
+By default the app proxies video bytes from the bucket, which keeps the PIN gate in front of every
+request. Setting `S3_SIGNED_URLS=true` instead redirects the player straight to a presigned URL —
+much cheaper, but that URL then works for anyone holding it until it expires.
+
+| | Local | S3 |
+|---|---|---|
+| New files detected by | filesystem events | polling (`WATCH_POLL_SECONDS`) |
+| Bytes served by | this app | this app, or a presigned redirect |
+| Needs the AWS SDK | no | yes |
+
+## Auto-import
+
+New files are picked up without a restart — drop one in and it appears. Because a copy fires an
+event the moment the file appears, the watcher waits for the size to stop changing
+(`WATCH_STABLE_SECONDS`, default 8s) before probing, so a half-copied 2 GB file never gets imported
+with a nonsense duration. Deletions are noticed too. Set `WATCH_ENABLED=false` to turn it off.
+
+## Requests
+
+`/requests` is a shared board — anyone signed in can ask for a film, vote on somebody else's
+request, and withdraw their own. Admins can mark one added or declined.
+
+Requests close themselves: when the watcher imports a file whose title matches an open request, it
+is marked fulfilled and linked to the new film, so nobody has to tick it off manually.
+
+## Admin
+
+`/admin` is visible only to admins and covers library health (size, films missing artwork, films
+with no TMDB match, files that won't play in a browser), scan controls, storage and auto-import
+status, profile management, and active sessions with per-session revoke.
+
+The first profile to sign in becomes the admin. If that isn't the right person, promote someone from
+the host machine:
+
+```bash
+npm --prefix backend run make-admin -- <profile name>
+```
+
+Run it with no name to list profiles and see who is currently an admin.
+
+Fixing a wrong TMDB match writes into `movies.json` rather than a hidden table, so the admin panel
+and a text editor never disagree about the truth.
+
 ## Where each field comes from
 
 Three sources, in strict priority order: **`movies.json` → TMDB → the file itself**. Anything you set
@@ -420,3 +485,9 @@ player preferences are stored per profile and follow you across devices.
   app works offline after the first load and viewers' IPs never reach TMDB's CDN.
 - **No transcoding or adaptive bitrate.** Every file streams at whatever it already is; your upload
   bandwidth is the bottleneck over a tunnel, not this server.
+
+## Future features
+
+- Transcoding support for unsupported file types
+- Better metadata extraction
+- Use cloud storage instead of local storage

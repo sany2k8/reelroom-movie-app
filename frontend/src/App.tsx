@@ -6,6 +6,8 @@ import { Detail } from "@/pages/Detail";
 import { Home } from "@/pages/Home";
 import { ListPage } from "@/pages/ListPage";
 import { Login } from "@/pages/Login";
+import { Requests } from "@/pages/Requests";
+import { Admin } from "@/pages/Admin";
 import { NotFound } from "@/pages/NotFound";
 import { Watch } from "@/pages/Watch";
 import { useSession } from "@/store/session";
@@ -38,6 +40,8 @@ export default function App() {
           <Route path="/watch/:id" element={<Watch />} />
           <Route path="/watchlist" element={<ListPage list="watchlist" />} />
           <Route path="/favourites" element={<ListPage list="favourite" />} />
+          <Route path="/requests" element={<Requests />} />
+          <Route path="/admin" element={<Admin />} />
           {/* Old two-page app linked here; keep the URL alive. */}
           <Route path="/movie.html" element={<Navigate to="/movies" replace />} />
           <Route path="*" element={<NotFound />} />

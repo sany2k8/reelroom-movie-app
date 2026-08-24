@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useSession } from "@/store/session";
 import { cx } from "@/lib/format";
-import { BookmarkIcon, HeartIcon, LogoutIcon, SearchIcon } from "./Icons";
+import { BookmarkIcon, HeartIcon, LogoutIcon, SearchIcon, SettingsIcon } from "./Icons";
 
 const LINKS = [
   { to: "/", label: "Home", end: true },
   { to: "/movies", label: "Movies", end: false },
   { to: "/watchlist", label: "Watchlist", end: false },
   { to: "/favourites", label: "Favourites", end: false },
+  { to: "/requests", label: "Requests", end: false },
 ];
 
 export function Navbar() {
@@ -144,6 +145,12 @@ export function Navbar() {
                 <HeartIcon className="h-4 w-4" /> Favourites
               </MenuLink>
             </div>
+
+            {profile?.isAdmin && (
+              <MenuLink to="/admin" onClick={() => setMenuOpen(false)}>
+                <SettingsIcon className="h-4 w-4" /> Admin
+              </MenuLink>
+            )}
 
             <button
               type="button"

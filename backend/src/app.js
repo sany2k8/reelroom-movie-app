@@ -8,12 +8,14 @@ import rateLimit from "express-rate-limit";
 import pinoHttp from "pino-http";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
-import { attachProfile, requireAuth } from "./middleware/auth.js";
+import { attachProfile, requireAdmin, requireAuth } from "./middleware/auth.js";
 import { errorHandler, notFound } from "./middleware/errors.js";
 import { authRouter } from "./routes/auth.js";
 import { moviesRouter } from "./routes/movies.js";
 import { streamRouter } from "./routes/stream.js";
 import { libraryRouter } from "./routes/library.js";
+import { requestsRouter } from "./routes/requests.js";
+import { adminRouter } from "./routes/admin.js";
 import { getScanState } from "./services/catalog.js";
 import { tmdbEnabled } from "./services/tmdb.js";
 
@@ -111,6 +113,8 @@ export function createApp() {
   // Everything past this point requires a session — including the video itself.
   app.use("/api/movies", requireAuth, moviesRouter);
   app.use("/api/library", requireAuth, libraryRouter);
+  app.use("/api/requests", requireAuth, requestsRouter);
+  app.use("/api/admin", requireAdmin, adminRouter);
   app.use("/api", requireAuth, streamRouter);
 
   app.use(

@@ -34,6 +34,31 @@ const schema = z.object({
   POSTERS_DIR: z.string().optional(),
   DATA_DIR: z.string().optional(),
 
+  /** Where the media lives. "local" reads MOVIES_DIR; "s3" reads a bucket. */
+  STORAGE_DRIVER: z.enum(["local", "s3"]).default("local"),
+  S3_BUCKET: z.string().optional(),
+  S3_REGION: z.string().default("us-east-1"),
+  /** Set for MinIO, Cloudflare R2, Backblaze B2 — leave blank for AWS. */
+  S3_ENDPOINT: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  S3_PREFIX: z.string().default(""),
+  S3_FORCE_PATH_STYLE: bool(false),
+  /**
+   * Redirect players straight to a presigned URL instead of proxying bytes.
+   * Much cheaper on the app server, but the URL works for anyone holding it
+   * until it expires — so it is off by default.
+   */
+  S3_SIGNED_URLS: bool(false),
+  S3_SIGNED_URL_TTL: z.coerce.number().int().positive().default(21600),
+
+  /** Pick up new files without a restart. */
+  WATCH_ENABLED: bool(true),
+  /** How long a file's size must stop changing before we import it. */
+  WATCH_STABLE_SECONDS: z.coerce.number().int().positive().default(8),
+  /** Object stores can't be watched, so they get polled instead. */
+  WATCH_POLL_SECONDS: z.coerce.number().int().positive().default(300),
+
   /** ngrok / cloudflared sit in front of us, so X-Forwarded-* is trustworthy. */
   TRUST_PROXY: bool(true),
   /** Set to your public tunnel origin to lock CORS down further. */
@@ -81,9 +106,36 @@ export const config = {
     frontend: path.join(ROOT, "frontend", "dist"),
   },
 
+  storage: {
+    driver: env.STORAGE_DRIVER,
+  },
+
+  s3: {
+    bucket: env.S3_BUCKET ?? null,
+    region: env.S3_REGION,
+    endpoint: env.S3_ENDPOINT || null,
+    accessKeyId: env.S3_ACCESS_KEY_ID || null,
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY || null,
+    // Normalised so callers can always concatenate without worrying about slashes.
+    prefix: env.S3_PREFIX ? env.S3_PREFIX.replace(/^\/+|\/+$/g, "") + "/" : "",
+    forcePathStyle: env.S3_FORCE_PATH_STYLE,
+    signedUrls: env.S3_SIGNED_URLS,
+    signedUrlTtlSeconds: env.S3_SIGNED_URL_TTL,
+  },
+
+  watch: {
+    enabled: env.WATCH_ENABLED,
+    stableSeconds: env.WATCH_STABLE_SECONDS,
+    pollSeconds: env.WATCH_POLL_SECONDS,
+  },
+
   trustProxy: env.TRUST_PROXY,
   publicOrigin: env.PUBLIC_ORIGIN ?? null,
 };
+
+if (config.storage.driver === "s3" && !config.s3.bucket) {
+  throw new Error("STORAGE_DRIVER=s3 requires S3_BUCKET");
+}
 
 config.paths.db = path.join(config.paths.data, "sunflix.db");
 config.paths.tmdbCache = path.join(config.paths.data, "tmdb");
